@@ -24,7 +24,7 @@ if not CONF_F.exists():
 CONF = json.loads(CONF_F.read_text())
 BUCKET, ENDPOINT = CONF["bucket"], CONF["endpoint"]  # endpoint: https://<account-id>.r2.cloudflarestorage.com
 RES_F, STATE_F = HERE / "resources.json", HERE / "state.json"
-VIDEO = {".mp4", ".mkv", ".m4v", ".mov", ".webm", ".avi"}
+VIDEO = {".mp4", ".mkv", ".m4v", ".mov", ".webm", ".avi", ".ts"}  # .ts: MPEG transport stream; a TypeScript file just fails the probe
 MP4ISH = {".mp4", ".m4v", ".mov"}
 TEXT_SUBS = {"subrip", "ass", "ssa", "mov_text", "webvtt"}
 KEY_HELP = f"""No R2 key in the keychain. Create one in the Cloudflare dashboard (R2 -> Manage API tokens ->
