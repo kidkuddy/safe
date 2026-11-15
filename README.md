@@ -4,8 +4,8 @@ Keep media folders (courses, recordings, shows you own) in a private Cloudflare 
 them from a small password-protected web page. One Python script, one Worker, one HTML file.
 
 - R2 has no egress fees, so streaming and downloading cost nothing. Storage is $0.015/GB-month after the first 10 GB.
-- Videos that browsers can play (8-bit H.264 with AAC/MP3) are streamed. MKVs with those codecs are repackaged to
-  MP4 without re-encoding. Everything else is offered as a download.
+- Videos that browsers can play (8-bit H.264 with AAC/MP3) are streamed. MKV, AVI and TS files with those codecs
+  are repackaged to MP4 without re-encoding. PDFs open in the page. Everything else is offered as a download.
 - Every upload is read back from the bucket, and a resource only counts as verified against a fresh bucket listing,
   so you know when it is safe to delete the local copy.
 
