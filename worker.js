@@ -15,15 +15,17 @@ const PASSIVE = /^(video|audio)\/|^image\/(png|jpeg|gif|webp)$|^text\/vtt$|^appl
 
 const hmacKey = (env) => crypto.subtle.importKey('raw', enc.encode(env.SESSION_KEY), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 
-// Session cookie: "<expiry ms>.<HMAC of expiry>", signed with SESSION_KEY, not derived from the password.
+// Session cookie: "<expiry ms>.<HMAC>", signed with SESSION_KEY. The signed text also covers a hash of the
+// current password, so changing PASSWORD (or SESSION_KEY) invalidates every existing session.
+const signed = async (env, exp) => enc.encode(exp + '.' + hex(await sha(env.PASSWORD)));
 async function newSession(env) {
   const exp = String(Date.now() + SESSION_DAYS * 864e5);
-  return exp + '.' + hex(await crypto.subtle.sign('HMAC', await hmacKey(env), enc.encode(exp)));
+  return exp + '.' + hex(await crypto.subtle.sign('HMAC', await hmacKey(env), await signed(env, exp)));
 }
 async function validSession(req, env) {
   const m = (req.headers.get('cookie') || '').match(/(?:^|;\s*)s=(\d{13})\.([0-9a-f]{64})(?:;|$)/);
   if (!m || Number(m[1]) < Date.now()) return false;
-  return crypto.subtle.verify('HMAC', await hmacKey(env), unhex(m[2]), enc.encode(m[1]));
+  return crypto.subtle.verify('HMAC', await hmacKey(env), unhex(m[2]), await signed(env, m[1]));
 }
 
 export default {
