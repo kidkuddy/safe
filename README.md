@@ -66,7 +66,7 @@ inside, so you can find things again if the bucket is ever lost.
 
 ## Limits
 
-- Single user. Logins last 30 days; changing `SESSION_KEY` logs every browser out.
+- Single user. Logins last 30 days; changing `PASSWORD` or `SESSION_KEY` logs every browser out.
 - Login attempts are rate-limited per client address (about 5 a minute; Cloudflare's limiter is approximate).
 - Only video, audio, common images and subtitles are shown in the browser. Every other file in the bucket is
   sent as a download, so an HTML file inside an uploaded folder cannot run on the site.
