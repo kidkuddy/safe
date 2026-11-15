@@ -34,6 +34,7 @@
   .room { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:26px; align-items:start; }
   .stage { position:sticky; top:20px; }
   video, .cover { width:100%; aspect-ratio:16/9; max-height:74vh; background:#000; border-radius:16px; display:block; }
+  iframe.doc { width:100%; height:78vh; border:0; border-radius:16px; background:#2a2a2a; display:block; }
   .cover { display:grid; place-items:center; text-align:center; padding:20px; font-size:17px; font-weight:600; }
   .stage h2 { font-size:24px; letter-spacing:-.01em; margin-top:16px; overflow-wrap:anywhere; }
   .stage p { color:var(--dim); margin:4px 0 14px; }
@@ -83,7 +84,8 @@ const sum = (a, f) => a.reduce((t, x) => t + (f(x) || 0), 0);
 const hue = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 const art = (r) => `linear-gradient(135deg,hsl(${hue(r.id)} 55% 40%),hsl(${(hue(r.id) + 50) % 360} 60% 15%))`;
 const vids = (r) => r.items.filter((i) => i.play);
-const meta = (r) => { const v = vids(r), sz = size(sum(r.items, (i) => i.size)); return v.length ? `${v.length} videos · ${hours(sum(v, (i) => i.dur))} · ${sz}` : `${r.items.length} files · download only · ${sz}`; };
+const isPdf = (it) => /\.pdf$/i.test(it.key);
+const meta = (r) => { const v = vids(r), sz = size(sum(r.items, (i) => i.size)); const p = r.items.filter(isPdf).length; return v.length ? `${v.length} videos · ${hours(sum(v, (i) => i.dur))} · ${sz}` : p ? `${r.items.length} files · ${p} PDF · ${sz}` : `${r.items.length} files · download only · ${sz}`; };
 // loose non-video files at the top level (notes, torrents) go last, under "Other files"
 const loose = (r, it) => vids(r).length && !it.play && !it.rel.includes('/');
 const section = (r, it) => loose(r, it) ? 'Other files' : it.rel.split('/').slice(-2, -1)[0] || '';
@@ -100,7 +102,7 @@ function library() {
     const v = vids(r), w = v.filter((i) => done[i.key]).length;
     const t = el('button', 'tile'), a = el('div', 'art');
     a.style.background = art(r);
-    a.append(el('span', '', v.length ? (w ? `${w} of ${v.length} watched` : hours(sum(v, (i) => i.dur))) : 'download only'));
+    a.append(el('span', '', v.length ? (w ? `${w} of ${v.length} watched` : hours(sum(v, (i) => i.dur))) : r.items.some(isPdf) ? 'documents' : 'download only'));
     const p = el('div', 'prog'), f = el('i'); f.style.width = (v.length ? 100 * w / v.length : 0) + '%'; p.append(f);
     t.append(a, el('b', '', r.title), el('small', '', meta(r)), p);
     t.onclick = () => { location.hash = encodeURIComponent(r.id); };
@@ -115,7 +117,7 @@ function course(r, it) {
   res = r; filter = '';
   const v = vids(r).filter((i) => i.up);
   // where to land: the requested item, else where you left off, else the first unwatched video
-  cur = it || v.find((i) => i.key === last[r.id]) || v.find((i) => !done[i.key]) || v[0] || null;
+  cur = it || v.find((i) => i.key === last[r.id]) || v.find((i) => !done[i.key]) || v[0] || r.items.find((i) => i.up && isPdf(i)) || null;
   const crumb = el('div', 'crumb'), back = el('button', '', '← Library');
   back.onclick = () => { location.hash = ''; };
   crumb.append(back, ' / ' + r.title);
@@ -138,6 +140,16 @@ function drawStage(autoplay) {
     return;
   }
   const it = cur;
+  if (isPdf(it)) {  // PDFs open in the browser's own viewer
+    const f = el('iframe', 'doc'); f.src = href(it.key); f.title = name(it);
+    const pills = el('div', 'pills');
+    const tab = el('a', 'pill go', 'Open in new tab'); tab.href = href(it.key); tab.target = '_blank'; tab.rel = 'noopener';
+    const dl = el('a', 'pill', '↓ Download'); dl.href = href(it.key) + '?dl=1';
+    pills.append(tab, dl);
+    stage.append(f, el('h2', '', name(it)), el('p', '', [r.title, section(r, it), 'PDF', size(it.size)].filter(Boolean).join(' · ')), pills);
+    document.title = name(it) + ' · safe';
+    return;
+  }
   video = el('video'); video.controls = true; video.playsInline = true; video.src = href(it.key);
   if (it.sub) { const t = el('track'); t.kind = 'subtitles'; t.label = 'Subtitles'; t.srclang = 'en'; t.src = href(it.sub); video.append(t); }
   video.onloadedmetadata = () => { const p = pos[it.key]; if (p && p < video.duration - 15) video.currentTime = p; };
@@ -169,8 +181,8 @@ function drawSide() {
     const row = el('button', 'row' + (it === cur ? ' on' : '') + (it.up ? '' : ' off'));
     const part = it.play && !done[it.key] && pos[it.key] > 5;
     row.append(el('span', 'n' + (done[it.key] ? ' done' : ''), it === cur ? '▶' : done[it.key] ? '✓' : n), el('span', 't', name(it)),
-      el('span', 'd' + (part ? ' part' : ''), !it.up ? 'not uploaded' : !it.play ? '↓ ' + size(it.size) : part ? clock(it.dur - pos[it.key]) + ' left' : clock(it.dur)));
-    if (it.up) row.onclick = () => it.play ? play(it, true) : (location.href = href(it.key) + '?dl=1'); else row.disabled = true;
+      el('span', 'd' + (part ? ' part' : ''), !it.up ? 'not uploaded' : isPdf(it) ? 'PDF · ' + size(it.size) : !it.play ? '↓ ' + size(it.size) : part ? clock(it.dur - pos[it.key]) + ' left' : clock(it.dur)));
+    if (it.up) row.onclick = () => it.play || isPdf(it) ? play(it, true) : (location.href = href(it.key) + '?dl=1'); else row.disabled = true;
     side.append(row);
   }
   if (!shown) side.append(el('p', 'empty', filter ? 'Nothing matches the filter.' : 'Nothing here yet.'));
@@ -190,7 +202,7 @@ function route() {
   const key = decodeURIComponent(location.hash.slice(1));
   const r = M.resources.find((x) => x.id === key.split('/')[0]);
   if (!r) return library();
-  const it = r.items.find((x) => x.key === key && x.up && x.play);
+  const it = r.items.find((x) => x.key === key && x.up && (x.play || isPdf(x)));
   course(r, it);
 }
 addEventListener('hashchange', route);

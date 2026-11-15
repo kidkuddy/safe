@@ -68,7 +68,7 @@ inside, so you can find things again if the bucket is ever lost.
 
 - Single user. Logins last 30 days; changing `PASSWORD` or `SESSION_KEY` logs every browser out.
 - Login attempts are rate-limited per client address (about 5 a minute; Cloudflare's limiter is approximate).
-- Only video, audio, common images and subtitles are shown in the browser. Every other file in the bucket is
+- Only video, audio, common images, subtitles and PDFs are shown in the browser. Every other file in the bucket is
   sent as a download, so an HTML file inside an uploaded folder cannot run on the site.
 - Watched state and resume positions live in the browser's `localStorage`, per device.
 - The keychain lookup is macOS-only.
