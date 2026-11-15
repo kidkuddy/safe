@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>safe</title>
+<style>
+  :root { color-scheme:dark; --bg:#121212; --card:#1b1b1b; --card2:#222; --pill:#1f1f1f; --hover:#242424; --fg:#ededed; --dim:#8a8a8a; --faint:#666; --acc:#3ddc97; --acc-bg:#203329; --on-acc:#07140d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, input { font:inherit; color:inherit; border:0; background:none; }
+  button, a.pill { cursor:pointer; }
+  :focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  h1, h2, h3, h4, p { margin:0; }
+  #app { min-height:100vh; padding:30px clamp(16px,4vw,56px) 70px; max-width:1700px; margin:0 auto; }
+  .dim { color:var(--dim); }
+
+  /* library */
+  .lib h1 { font-size:30px; letter-spacing:-.02em; margin-bottom:6px; }
+  .lib .sub { color:var(--dim); margin-bottom:26px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:18px; }
+  .tile { background:var(--card); border-radius:20px; padding:14px; text-align:left; display:block; width:100%; transition:background .15s, transform .15s; }
+  .tile:hover { background:var(--card2); transform:translateY(-2px); }
+  .art { height:130px; border-radius:14px; display:grid; place-items:end start; padding:12px; font-weight:700; font-size:13px; }
+  .art span { background:#0009; padding:4px 10px; border-radius:999px; }
+  .tile b { display:block; margin:12px 4px 2px; font-size:16px; }
+  .tile small { color:var(--dim); margin:0 4px; }
+  .prog { height:5px; border-radius:3px; background:#2a2a2a; margin:12px 4px 2px; overflow:hidden; }
+  .prog i { display:block; height:100%; border-radius:3px; background:var(--acc); }
+
+  /* classroom */
+  .crumb { color:var(--dim); margin-bottom:22px; font-size:14px; }
+  .crumb button { color:var(--acc); padding:4px 0; }
+  .room { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:26px; align-items:start; }
+  .stage { position:sticky; top:20px; }
+  video, .cover { width:100%; aspect-ratio:16/9; max-height:74vh; background:#000; border-radius:16px; display:block; }
+  .cover { display:grid; place-items:center; text-align:center; padding:20px; font-size:17px; font-weight:600; }
+  .stage h2 { font-size:24px; letter-spacing:-.01em; margin-top:16px; overflow-wrap:anywhere; }
+  .stage p { color:var(--dim); margin:4px 0 14px; }
+  .pills { display:flex; flex-wrap:wrap; gap:8px; }
+  .pill { background:var(--pill); padding:9px 16px; border-radius:999px; font-size:14px; text-decoration:none; color:var(--fg); }
+  .pill:hover { background:#2a2a2a; }
+  .pill.go { background:var(--acc); color:var(--on-acc); font-weight:700; }
+  .pill.go:hover { filter:brightness(1.08); }
+  .side { background:var(--card); border-radius:20px; padding:10px; max-height:calc(100vh - 110px); overflow:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+  #q { width:100%; background:#141414; border-radius:12px; padding:10px 14px; margin-bottom:4px; }
+  #q::placeholder { color:var(--faint); }
+  h4 { margin:16px 12px 6px; font-size:13px; color:var(--dim); font-weight:600; }
+  .row { display:grid; grid-template-columns:30px minmax(0,1fr) auto; gap:8px; width:100%; padding:10px 12px; border-radius:12px; align-items:center; font-size:14px; text-align:left; }
+  .row:hover { background:var(--hover); }
+  .row.on { background:var(--acc-bg); color:var(--acc); }
+  .row.off { opacity:.4; cursor:default; }
+  .row .n { color:#7c7c7c; font-size:12px; font-variant-numeric:tabular-nums; text-align:center; }
+  .row.on .n, .row .n.done { color:var(--acc); }
+  .row .t { overflow-wrap:anywhere; }
+  .row .d { color:#7c7c7c; font-size:12px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .row .d.part { color:var(--acc); }
+  .empty { color:var(--faint); padding:18px 12px; }
+
+  @media (max-width: 980px) {
+    #app { padding:18px 16px 60px; }
+    .room { grid-template-columns:1fr; }
+    .stage { position:static; }
+    .side { max-height:none; }
+    .lib h1 { font-size:24px; }
+    .stage h2 { font-size:20px; }
+  }
+</style>
+<div id="app"></div>
+<script>
+const app = document.getElementById('app');
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const href = (k) => '/' + k.split('/').map(encodeURIComponent).join('/');
+// localStorage can be unavailable (private window); the page must still work without it
+const load = (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const pos = load('pos'), done = load('done'), last = load('last');
+const size = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.max(1, Math.round(n / 1e6)) + ' MB';
+const clock = (s) => { s = Math.round(s || 0); const m = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, '0'); return s >= 3600 ? `${Math.floor(s / 3600)}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`; };
+const hours = (s) => s >= 3600 ? Math.round(s / 3600) + ' h' : Math.round(s / 60) + ' min';
+const name = (it) => it.rel.split('/').pop().replace(/\.[^.]+$/, '');
+const sum = (a, f) => a.reduce((t, x) => t + (f(x) || 0), 0);
+const hue = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const art = (r) => `linear-gradient(135deg,hsl(${hue(r.id)} 55% 40%),hsl(${(hue(r.id) + 50) % 360} 60% 15%))`;
+const vids = (r) => r.items.filter((i) => i.play);
+const meta = (r) => { const v = vids(r), sz = size(sum(r.items, (i) => i.size)); return v.length ? `${v.length} videos · ${hours(sum(v, (i) => i.dur))} · ${sz}` : `${r.items.length} files · download only · ${sz}`; };
+// loose non-video files at the top level (notes, torrents) go last, under "Other files"
+const loose = (r, it) => vids(r).length && !it.play && !it.rel.includes('/');
+const section = (r, it) => loose(r, it) ? 'Other files' : it.rel.split('/').slice(-2, -1)[0] || '';
+const ordered = (r) => [...r.items.filter((i) => !loose(r, i)), ...r.items.filter((i) => loose(r, i))];
+let M, res, cur, video, lastSave = 0, filter = '';
+
+function library() {
+  res = cur = video = null;
+  document.title = 'safe';
+  const box = el('div', 'lib');
+  box.append(el('h1', '', 'Your library'), el('p', 'sub', `${M.resources.length} resources · ${size(sum(M.resources, (r) => sum(r.items, (i) => i.size)))}`));
+  const grid = el('div', 'grid');
+  for (const r of M.resources) {
+    const v = vids(r), w = v.filter((i) => done[i.key]).length;
+    const t = el('button', 'tile'), a = el('div', 'art');
+    a.style.background = art(r);
+    a.append(el('span', '', v.length ? (w ? `${w} of ${v.length} watched` : hours(sum(v, (i) => i.dur))) : 'download only'));
+    const p = el('div', 'prog'), f = el('i'); f.style.width = (v.length ? 100 * w / v.length : 0) + '%'; p.append(f);
+    t.append(a, el('b', '', r.title), el('small', '', meta(r)), p);
+    t.onclick = () => { location.hash = encodeURIComponent(r.id); };
+    grid.append(t);
+  }
+  box.append(grid);
+  app.replaceChildren(box);
+  scrollTo(0, 0);
+}
+
+function course(r, it) {
+  res = r; filter = '';
+  const v = vids(r).filter((i) => i.up);
+  // where to land: the requested item, else where you left off, else the first unwatched video
+  cur = it || v.find((i) => i.key === last[r.id]) || v.find((i) => !done[i.key]) || v[0] || null;
+  const crumb = el('div', 'crumb'), back = el('button', '', '← Library');
+  back.onclick = () => { location.hash = ''; };
+  crumb.append(back, ' / ' + r.title);
+  const room = el('div', 'room'), stage = el('div', 'stage'), side = el('div', 'side');
+  stage.id = 'stage'; side.id = 'side';
+  room.append(stage, side);
+  app.replaceChildren(crumb, room);
+  drawStage(false); drawSide();
+  scrollTo(0, 0);
+}
+
+function drawStage(autoplay) {
+  const stage = document.getElementById('stage'), r = res;
+  stage.textContent = ''; video = null;
+  if (!cur) {
+    const c = el('div', 'cover', vids(r).length ? 'Nothing uploaded yet' : 'Download only: these files do not play in a browser. Pick one on the right to download it.');
+    c.style.background = art(r);
+    stage.append(c, el('h2', '', r.title), el('p', '', meta(r)));
+    document.title = r.title + ' · safe';
+    return;
+  }
+  const it = cur;
+  video = el('video'); video.controls = true; video.playsInline = true; video.src = href(it.key);
+  if (it.sub) { const t = el('track'); t.kind = 'subtitles'; t.label = 'Subtitles'; t.srclang = 'en'; t.src = href(it.sub); video.append(t); }
+  video.onloadedmetadata = () => { const p = pos[it.key]; if (p && p < video.duration - 15) video.currentTime = p; };
+  video.ontimeupdate = () => { if (Date.now() - lastSave > 5000) { lastSave = Date.now(); pos[it.key] = video.currentTime; save('pos', pos); } };
+  video.onended = () => { setDone(it, true); const n = next(); if (n) play(n, true); };
+  const pills = el('div', 'pills');
+  const mark = el('button', 'pill go'); const label = () => { mark.textContent = done[it.key] ? '✓ Watched' : 'Mark as watched'; }; label();
+  mark.onclick = () => { setDone(it, !done[it.key]); label(); };
+  const dl = el('a', 'pill', '↓ Download'); dl.href = href(it.key) + '?dl=1';
+  pills.append(mark, dl);
+  if (next()) { const n = el('button', 'pill', 'Next lesson →'); n.onclick = () => play(next(), true); pills.append(n); }
+  stage.append(video, el('h2', '', name(it)), el('p', '', [r.title, section(r, it), clock(it.dur), size(it.size)].filter(Boolean).join(' · ')), pills);
+  document.title = name(it) + ' · safe';
+  last[r.id] = it.key; save('last', last);
+  if (autoplay) video.play().catch(() => {});
+}
+
+function drawSide() {
+  const side = document.getElementById('side'), r = res;
+  let q = side.querySelector('#q');
+  if (!q) { q = el('input'); q.id = 'q'; q.type = 'search'; q.placeholder = 'Filter lessons'; q.setAttribute('aria-label', 'Filter lessons'); q.oninput = () => { filter = q.value.toLowerCase(); drawSide(); }; side.append(q); }
+  while (q.nextSibling) q.nextSibling.remove();
+  let sec = null, n = 0, shown = 0;
+  for (const it of ordered(r)) {
+    if (filter && !it.rel.toLowerCase().includes(filter)) continue;
+    const s = section(r, it);
+    if (s !== sec) { sec = s; n = 0; if (s) side.append(el('h4', '', s)); }
+    n++; shown++;
+    const row = el('button', 'row' + (it === cur ? ' on' : '') + (it.up ? '' : ' off'));
+    const part = it.play && !done[it.key] && pos[it.key] > 5;
+    row.append(el('span', 'n' + (done[it.key] ? ' done' : ''), it === cur ? '▶' : done[it.key] ? '✓' : n), el('span', 't', name(it)),
+      el('span', 'd' + (part ? ' part' : ''), !it.up ? 'not uploaded' : !it.play ? '↓ ' + size(it.size) : part ? clock(it.dur - pos[it.key]) + ' left' : clock(it.dur)));
+    if (it.up) row.onclick = () => it.play ? play(it, true) : (location.href = href(it.key) + '?dl=1'); else row.disabled = true;
+    side.append(row);
+  }
+  if (!shown) side.append(el('p', 'empty', filter ? 'Nothing matches the filter.' : 'Nothing here yet.'));
+}
+
+const next = () => { const o = ordered(res); return o.slice(o.indexOf(cur) + 1).find((i) => i.play && i.up); };
+function setDone(it, v) { if (v) { done[it.key] = 1; delete pos[it.key]; save('pos', pos); } else delete done[it.key]; save('done', done); drawSide(); }
+function play(it, autoplay) {
+  cur = it;
+  history.replaceState(null, '', '#' + encodeURIComponent(it.key));
+  drawStage(autoplay); drawSide();
+  document.querySelector('.row.on')?.scrollIntoView({ block: 'nearest' });
+  if (matchMedia('(max-width: 980px)').matches) scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function route() {
+  const key = decodeURIComponent(location.hash.slice(1));
+  const r = M.resources.find((x) => x.id === key.split('/')[0]);
+  if (!r) return library();
+  const it = r.items.find((x) => x.key === key && x.up && x.play);
+  course(r, it);
+}
+addEventListener('hashchange', route);
+
+fetch('/manifest.json').then((r) => r.json()).then((m) => { M = m; route(); })
+  .catch((e) => { app.replaceChildren(el('p', 'empty', 'Could not load manifest.json: ' + e.message)); });
+</script>
+</html>

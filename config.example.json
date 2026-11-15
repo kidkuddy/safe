@@ -1,0 +1,4 @@
+{
+  "bucket": "my-bucket",
+  "endpoint": "https://<cloudflare-account-id>.r2.cloudflarestorage.com"
+}

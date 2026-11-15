@@ -1,0 +1,14 @@
+# account-specific and personal: never commit
+.password
+config.json
+resources.json
+state.json
+manifest.json
+ARCHIVE.md
+TODO.md
+push*.log
+tmp*/
+__pycache__/
+.wrangler/
+.playwright-mcp/
+.DS_Store

@@ -1,0 +1,17 @@
+name = "safe"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "B"
+bucket_name = "safe"
+
+# login attempts: 5 per minute per client address
+[[ratelimits]]
+name = "LOGIN"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
