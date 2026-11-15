@@ -9,9 +9,9 @@ const LOGIN = `<!doctype html><meta charset=utf-8><meta name=viewport content="w
 <body style="background:#121212;color:#ededed;font:16px system-ui;display:grid;place-items:center;height:100vh;margin:0">
 <form method=post action=/login><label>Password <input type=password name=p autofocus required></label> <button>Enter</button></form>`;
 const SESSION_DAYS = 30;
-// Types a browser only displays or plays. Anything else from the bucket (html, svg, pdf, unknown) is sent as a
+// Types a browser only displays or plays (PDFs open in the browser's sandboxed viewer). Anything else from the bucket (html, svg, pdf, unknown) is sent as a
 // download, so a file inside an uploaded folder can never run as a page on this origin.
-const PASSIVE = /^(video|audio)\/|^image\/(png|jpeg|gif|webp)$|^text\/vtt$|^application\/json$/;
+const PASSIVE = /^(video|audio)\/|^image\/(png|jpeg|gif|webp)$|^text\/vtt$|^application\/(json|pdf)$/;
 
 const hmacKey = (env) => crypto.subtle.importKey('raw', enc.encode(env.SESSION_KEY), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 
