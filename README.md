@@ -29,6 +29,7 @@ Needs macOS, Python 3.9+, `ffmpeg`, the `aws` CLI and Node (for `npx wrangler`).
    npx wrangler r2 bucket create my-bucket
    npx wrangler deploy
    npx wrangler secret put PASSWORD
+   npx wrangler secret put SESSION_KEY     # any long random string; signs the login cookie
    ```
 
 2. Copy `config.example.json` to `config.json` and fill in the bucket and your endpoint
@@ -65,7 +66,10 @@ inside, so you can find things again if the bucket is ever lost.
 
 ## Limits
 
-- Single user. The session cookie is a fixed hash of the password, so changing the password is the only logout.
+- Single user. Logins last 30 days; changing `SESSION_KEY` logs every browser out.
+- Login attempts are rate-limited per client address (about 5 a minute; Cloudflare's limiter is approximate).
+- Only video, audio, common images and subtitles are shown in the browser. Every other file in the bucket is
+  sent as a download, so an HTML file inside an uploaded folder cannot run on the site.
 - Watched state and resume positions live in the browser's `localStorage`, per device.
 - The keychain lookup is macOS-only.
 - Only store files you have the right to keep.
