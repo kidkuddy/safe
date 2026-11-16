@@ -59,6 +59,11 @@
   .row .d { color:#7c7c7c; font-size:12px; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .row .d.part { color:var(--acc); }
   .empty { color:var(--faint); padding:18px 12px; }
+  dialog { background:var(--card2); color:var(--fg); border:0; border-radius:20px; padding:24px; width:min(420px, calc(100vw - 32px)); }
+  dialog::backdrop { background:#000a; }
+  dialog h3 { font-size:18px; overflow-wrap:anywhere; }
+  dialog p { color:var(--dim); margin:6px 0 20px; }
+  dialog .pills { justify-content:flex-end; }
 
   @media (max-width: 980px) {
     #app { padding:18px 16px 60px; }
@@ -70,6 +75,7 @@
   }
 </style>
 <div id="app"></div>
+<dialog id="ask"><h3></h3><p></p><div class="pills"><button class="pill" id="ask-no">Cancel</button><button class="pill go" id="ask-yes">Download</button></div></dialog>
 <script>
 const app = document.getElementById('app');
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -96,6 +102,17 @@ const loose = (r, it) => vids(r).length && !it.play && !it.rel.includes('/');
 const section = (r, it) => loose(r, it) ? 'Other files' : it.rel.split('/').slice(-2, -1)[0] || '';
 const ordered = (r) => [...r.items.filter((i) => !loose(r, i)), ...r.items.filter((i) => loose(r, i))];
 let M, res, cur, video, lastSave = 0, filter = '';
+
+// every download goes through this confirmation; Esc or a click outside cancels
+const ask = document.getElementById('ask');
+function download(it) {
+  ask.querySelector('h3').textContent = 'Download ' + it.rel.split('/').pop() + '?';
+  ask.querySelector('p').textContent = size(it.size) + ' will be saved to this device.';
+  document.getElementById('ask-yes').onclick = () => { ask.close(); location.href = href(it.key) + '?dl=1'; };
+  ask.showModal();
+}
+document.getElementById('ask-no').onclick = () => ask.close();
+ask.onclick = (e) => { if (e.target === ask) ask.close(); };
 
 function library() {
   res = cur = video = null;
@@ -157,7 +174,7 @@ function drawStage(autoplay) {
     }
     const pills = el('div', 'pills');
     const tab = el('a', 'pill go', 'Open in new tab'); tab.href = href(it.key); tab.target = '_blank'; tab.rel = 'noopener';
-    const dl = el('a', 'pill', '↓ Download'); dl.href = href(it.key) + '?dl=1';
+    const dl = el('button', 'pill', '↓ Download'); dl.onclick = () => download(it);
     if (k !== 'text') pills.append(tab);  // text files are served as downloads, so a new tab would just download
     pills.append(dl);
     const n = next(k);
@@ -174,7 +191,7 @@ function drawStage(autoplay) {
   const pills = el('div', 'pills');
   const mark = el('button', 'pill go'); const label = () => { mark.textContent = done[it.key] ? '✓ Watched' : 'Mark as watched'; }; label();
   mark.onclick = () => { setDone(it, !done[it.key]); label(); };
-  const dl = el('a', 'pill', '↓ Download'); dl.href = href(it.key) + '?dl=1';
+  const dl = el('button', 'pill', '↓ Download'); dl.onclick = () => download(it);
   pills.append(mark, dl);
   if (next()) { const n = el('button', 'pill', 'Next lesson →'); n.onclick = () => play(next(), true); pills.append(n); }
   stage.append(video, el('h2', '', name(it)), el('p', '', [r.title, section(r, it), clock(it.dur), size(it.size)].filter(Boolean).join(' · ')), pills);
@@ -198,7 +215,7 @@ function drawSide() {
     const part = it.play && !done[it.key] && pos[it.key] > 5;
     row.append(el('span', 'n' + (done[it.key] ? ' done' : ''), it === cur ? '▶' : done[it.key] ? '✓' : n), el('span', 't', name(it)),
       el('span', 'd' + (part ? ' part' : ''), !it.up ? 'not uploaded' : !it.play && kind(it) ? LABEL[kind(it)] + ' · ' + size(it.size) : !it.play ? '↓ ' + size(it.size) : part ? clock(it.dur - pos[it.key]) + ' left' : clock(it.dur)));
-    if (it.up) row.onclick = () => kind(it) ? play(it, true) : (location.href = href(it.key) + '?dl=1'); else row.disabled = true;
+    if (it.up) row.onclick = () => kind(it) ? play(it, true) : download(it); else row.disabled = true;
     side.append(row);
   }
   if (!shown) side.append(el('p', 'empty', filter ? 'Nothing matches the filter.' : 'Nothing here yet.'));
