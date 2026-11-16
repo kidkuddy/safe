@@ -50,7 +50,8 @@ Needs macOS, Python 3.9+, `ffmpeg`, the `aws` CLI and Node (for `npx wrangler`).
 ```
 ./safe add ~/Downloads/"Some Course"     track a folder or file as its own resource
 ./safe ls                                what is tracked, sizes, how much is uploaded and verified
-./safe push [id...] [--jobs N]           upload (smallest remaining first), verify, refresh the site
+./safe push [id...] [--jobs N] [--limit MBPS]   upload (smallest remaining first), verify, refresh the site;
+                                         --limit caps total upload speed
 ./safe check <id>                        health check: every file present, every video opens with the right length
 ./safe pull <id> [dest]                  download a resource back
 ./safe rm <id> [--purge]                 stop tracking; --purge also deletes it from the bucket

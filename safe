@@ -4,7 +4,9 @@
   ./safe ls                         what is tracked, how big, how much is uploaded
   ./safe add <path>... [--title T]  track a folder or file as its own resource
   ./safe rm <id> [--purge]          stop tracking (--purge also deletes it from the bucket)
-  ./safe push [id...] [--jobs N]    convert where needed, upload N files at once (default 4), verify, refresh the site
+  ./safe push [id...] [--jobs N] [--limit MBPS]
+                                    convert where needed, upload N files at once (default 4), verify, refresh the
+                                    site; --limit caps total upload speed so the connection stays usable
   ./safe check <id>                 health check: every file present, every video opens with the right length
   ./safe pull <id> [dest]           download a resource back from the bucket
   ./safe selftest
@@ -208,6 +210,7 @@ def scan(resources):
 # ---------- R2 ----------
 
 _env = None
+THROTTLE = 0  # KB/s per upload process; 0 = unlimited. Set by `push --limit`.
 
 
 def env(required=True):
@@ -230,6 +233,11 @@ def env(required=True):
             "AWS_DEFAULT_REGION": "auto",
             # R2 does not accept the extra checksums newer aws CLIs add by default
             "AWS_REQUEST_CHECKSUM_CALCULATION": "when_required", "AWS_RESPONSE_CHECKSUM_VALIDATION": "when_required"}
+        if THROTTLE:  # a private aws config, so the user's own aws profiles are not touched
+            fd, path = tempfile.mkstemp(prefix="safe-aws-", suffix=".conf")
+            os.write(fd, f"[default]\ns3 =\n  max_bandwidth = {THROTTLE}KB/s\n  max_concurrent_requests = 4\n".encode())
+            os.close(fd)
+            _env["AWS_CONFIG_FILE"] = path
     return _env
 
 
@@ -416,6 +424,9 @@ def publish(cols, remote):
 
 
 def cmd_push(a):
+    global THROTTLE
+    if getattr(a, "limit", 0):  # --limit is the total in Mbps, shared between the parallel uploads
+        THROTTLE = max(50, int(a.limit * 1000 / 8 / a.jobs))
     cols = scan(load_resources())
     by_id = {r["id"]: (r, items) for r, items in cols}
     if bad := [i for i in a.ids if i not in by_id and i != "-"]:
@@ -535,6 +546,7 @@ def main():
     p.add_argument("id"); p.add_argument("--purge", action="store_true", help="also delete it from the bucket")
     p = sub.add_parser("push", help="upload and verify"); p.set_defaults(f=cmd_push)
     p.add_argument("ids", nargs="*"); p.add_argument("--jobs", type=int, default=4, help="files uploaded at once (default 4)")
+    p.add_argument("--limit", type=float, default=0, metavar="MBPS", help="cap total upload speed, e.g. --limit 20")
     p = sub.add_parser("check", help="health-check one resource in the bucket"); p.set_defaults(f=cmd_check)
     p.add_argument("id")
     p = sub.add_parser("pull", help="download a resource back"); p.set_defaults(f=cmd_pull)
