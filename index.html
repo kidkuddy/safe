@@ -34,6 +34,8 @@
   .room { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:26px; align-items:start; }
   .stage { position:sticky; top:20px; }
   video, .cover { width:100%; aspect-ratio:16/9; max-height:74vh; background:#000; border-radius:16px; display:block; }
+  img.pic { width:100%; max-height:78vh; object-fit:contain; border-radius:16px; background:var(--card); display:block; }
+  pre.txt { margin:0; background:var(--card); border-radius:16px; padding:20px; max-height:78vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:13px/1.55 ui-monospace, Menlo, monospace; }
   iframe.doc { width:100%; height:78vh; border:0; border-radius:16px; background:#2a2a2a; display:block; }
   .cover { display:grid; place-items:center; text-align:center; padding:20px; font-size:17px; font-weight:600; }
   .stage h2 { font-size:24px; letter-spacing:-.01em; margin-top:16px; overflow-wrap:anywhere; }
@@ -76,7 +78,7 @@ const href = (k) => '/' + k.split('/').map(encodeURIComponent).join('/');
 const load = (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const pos = load('pos'), done = load('done'), last = load('last');
-const size = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.max(1, Math.round(n / 1e6)) + ' MB';
+const size = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? Math.round(n / 1e6) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
 const clock = (s) => { s = Math.round(s || 0); const m = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, '0'); return s >= 3600 ? `${Math.floor(s / 3600)}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`; };
 const hours = (s) => s >= 3600 ? Math.round(s / 3600) + ' h' : Math.round(s / 60) + ' min';
 const name = (it) => it.rel.split('/').pop().replace(/\.[^.]+$/, '');
@@ -84,8 +86,11 @@ const sum = (a, f) => a.reduce((t, x) => t + (f(x) || 0), 0);
 const hue = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 const art = (r) => `linear-gradient(135deg,hsl(${hue(r.id)} 55% 40%),hsl(${(hue(r.id) + 50) % 360} 60% 15%))`;
 const vids = (r) => r.items.filter((i) => i.play);
-const isPdf = (it) => /\.pdf$/i.test(it.key);
-const meta = (r) => { const v = vids(r), sz = size(sum(r.items, (i) => i.size)); const p = r.items.filter(isPdf).length; return v.length ? `${v.length} videos · ${hours(sum(v, (i) => i.dur))} · ${sz}` : p ? `${r.items.length} files · ${p} PDF · ${sz}` : `${r.items.length} files · download only · ${sz}`; };
+// what the page can show itself; anything else is download-only
+const kind = (it) => it.play ? 'video' : /\.pdf$/i.test(it.key) ? 'pdf' : /\.(png|jpe?g|gif|webp)$/i.test(it.key) ? 'image' : /\.(txt|md|nfo|srt|vtt|csv|json|log|url|xml)$/i.test(it.key) ? 'text' : null;
+const LABEL = { pdf: 'PDF', image: 'Image', text: 'Text' };
+const TEXT_MAX = 2e6;
+const meta = (r) => { const v = vids(r), sz = size(sum(r.items, (i) => i.size)); const p = r.items.filter(kind).length; return v.length ? `${v.length} videos · ${hours(sum(v, (i) => i.dur))} · ${sz}` : p ? `${r.items.length} files · ${sz}` : `${r.items.length} files · download only · ${sz}`; };
 // loose non-video files at the top level (notes, torrents) go last, under "Other files"
 const loose = (r, it) => vids(r).length && !it.play && !it.rel.includes('/');
 const section = (r, it) => loose(r, it) ? 'Other files' : it.rel.split('/').slice(-2, -1)[0] || '';
@@ -102,7 +107,7 @@ function library() {
     const v = vids(r), w = v.filter((i) => done[i.key]).length;
     const t = el('button', 'tile'), a = el('div', 'art');
     a.style.background = art(r);
-    a.append(el('span', '', v.length ? (w ? `${w} of ${v.length} watched` : hours(sum(v, (i) => i.dur))) : r.items.some(isPdf) ? 'documents' : 'download only'));
+    a.append(el('span', '', v.length ? (w ? `${w} of ${v.length} watched` : hours(sum(v, (i) => i.dur))) : r.items.some(kind) ? 'documents' : 'download only'));
     const p = el('div', 'prog'), f = el('i'); f.style.width = (v.length ? 100 * w / v.length : 0) + '%'; p.append(f);
     t.append(a, el('b', '', r.title), el('small', '', meta(r)), p);
     t.onclick = () => { location.hash = encodeURIComponent(r.id); };
@@ -117,7 +122,7 @@ function course(r, it) {
   res = r; filter = '';
   const v = vids(r).filter((i) => i.up);
   // where to land: the requested item, else where you left off, else the first unwatched video
-  cur = it || v.find((i) => i.key === last[r.id]) || v.find((i) => !done[i.key]) || v[0] || r.items.find((i) => i.up && isPdf(i)) || null;
+  cur = it || v.find((i) => i.key === last[r.id]) || v.find((i) => !done[i.key]) || v[0] || r.items.find((i) => i.up && kind(i)) || null;
   const crumb = el('div', 'crumb'), back = el('button', '', '← Library');
   back.onclick = () => { location.hash = ''; };
   crumb.append(back, ' / ' + r.title);
@@ -133,20 +138,31 @@ function drawStage(autoplay) {
   const stage = document.getElementById('stage'), r = res;
   stage.textContent = ''; video = null;
   if (!cur) {
-    const c = el('div', 'cover', vids(r).length ? 'Nothing uploaded yet' : 'Download only: these files do not play in a browser. Pick one on the right to download it.');
+    const c = el('div', 'cover', vids(r).length ? 'Nothing uploaded yet' : 'Download only: these files cannot be shown in a browser. Pick one on the right to download it.');
     c.style.background = art(r);
     stage.append(c, el('h2', '', r.title), el('p', '', meta(r)));
     document.title = r.title + ' · safe';
     return;
   }
   const it = cur;
-  if (isPdf(it)) {  // PDFs open in the browser's own viewer
-    const f = el('iframe', 'doc'); f.src = href(it.key); f.title = name(it);
+  const k = kind(it);
+  if (k !== 'video') {  // PDF in the browser's viewer, image as a picture, text fetched and shown as plain text
+    let view;
+    if (k === 'pdf') { view = el('iframe', 'doc'); view.src = href(it.key); view.title = name(it); }
+    else if (k === 'image') { view = el('img', 'pic'); view.src = href(it.key); view.alt = name(it); }
+    else {
+      view = el('pre', 'txt', it.size > TEXT_MAX ? 'This file is too large to show here. Use Download.' : 'Loading…');
+      if (it.size <= TEXT_MAX) fetch(href(it.key)).then((x) => x.ok ? x.text() : Promise.reject(new Error(x.status)))
+        .then((t) => { if (cur === it) view.textContent = t; }).catch((e) => { if (cur === it) view.textContent = 'Could not load this file: ' + e.message; });
+    }
     const pills = el('div', 'pills');
     const tab = el('a', 'pill go', 'Open in new tab'); tab.href = href(it.key); tab.target = '_blank'; tab.rel = 'noopener';
     const dl = el('a', 'pill', '↓ Download'); dl.href = href(it.key) + '?dl=1';
-    pills.append(tab, dl);
-    stage.append(f, el('h2', '', name(it)), el('p', '', [r.title, section(r, it), 'PDF', size(it.size)].filter(Boolean).join(' · ')), pills);
+    if (k !== 'text') pills.append(tab);  // text files are served as downloads, so a new tab would just download
+    pills.append(dl);
+    const n = next(k);
+    if (n) { const nb = el('button', 'pill', `Next ${LABEL[k].toLowerCase()} →`); nb.onclick = () => play(n, false); pills.append(nb); }
+    stage.append(view, el('h2', '', name(it)), el('p', '', [r.title, section(r, it), LABEL[k], size(it.size)].filter(Boolean).join(' · ')), pills);
     document.title = name(it) + ' · safe';
     return;
   }
@@ -181,14 +197,14 @@ function drawSide() {
     const row = el('button', 'row' + (it === cur ? ' on' : '') + (it.up ? '' : ' off'));
     const part = it.play && !done[it.key] && pos[it.key] > 5;
     row.append(el('span', 'n' + (done[it.key] ? ' done' : ''), it === cur ? '▶' : done[it.key] ? '✓' : n), el('span', 't', name(it)),
-      el('span', 'd' + (part ? ' part' : ''), !it.up ? 'not uploaded' : isPdf(it) ? 'PDF · ' + size(it.size) : !it.play ? '↓ ' + size(it.size) : part ? clock(it.dur - pos[it.key]) + ' left' : clock(it.dur)));
-    if (it.up) row.onclick = () => it.play || isPdf(it) ? play(it, true) : (location.href = href(it.key) + '?dl=1'); else row.disabled = true;
+      el('span', 'd' + (part ? ' part' : ''), !it.up ? 'not uploaded' : !it.play && kind(it) ? LABEL[kind(it)] + ' · ' + size(it.size) : !it.play ? '↓ ' + size(it.size) : part ? clock(it.dur - pos[it.key]) + ' left' : clock(it.dur)));
+    if (it.up) row.onclick = () => kind(it) ? play(it, true) : (location.href = href(it.key) + '?dl=1'); else row.disabled = true;
     side.append(row);
   }
   if (!shown) side.append(el('p', 'empty', filter ? 'Nothing matches the filter.' : 'Nothing here yet.'));
 }
 
-const next = () => { const o = ordered(res); return o.slice(o.indexOf(cur) + 1).find((i) => i.play && i.up); };
+const next = (k = 'video') => { const o = ordered(res); return o.slice(o.indexOf(cur) + 1).find((i) => i.up && kind(i) === k); };
 function setDone(it, v) { if (v) { done[it.key] = 1; delete pos[it.key]; save('pos', pos); } else delete done[it.key]; save('done', done); drawSide(); }
 function play(it, autoplay) {
   cur = it;
@@ -202,7 +218,7 @@ function route() {
   const key = decodeURIComponent(location.hash.slice(1));
   const r = M.resources.find((x) => x.id === key.split('/')[0]);
   if (!r) return library();
-  const it = r.items.find((x) => x.key === key && x.up && (x.play || isPdf(x)));
+  const it = r.items.find((x) => x.key === key && x.up && kind(x));
   course(r, it);
 }
 addEventListener('hashchange', route);
