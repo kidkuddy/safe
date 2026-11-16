@@ -7,8 +7,8 @@ const unhex = (s) => new Uint8Array(s.match(/../g).map((b) => parseInt(b, 16)));
 const html = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' };
 const LOGIN = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>safe</title>
 <body style="background:#121212;color:#ededed;font:16px system-ui;display:grid;place-items:center;height:100vh;margin:0">
-<form method=post action=/login><label>Password <input type=password name=p autofocus required></label> <button>Enter</button></form>`;
-const SESSION_DAYS = 30;
+<form method=post action=/login><input type=text name=u value=safe autocomplete=username hidden><label>Password <input type=password name=p autocomplete=current-password autofocus required></label> <button>Enter</button></form>`;
+const SESSION_DAYS = 365;
 // Types a browser only displays or plays (PDFs open in the browser's sandboxed viewer). Anything else from the bucket (html, svg, pdf, unknown) is sent as a
 // download, so a file inside an uploaded folder can never run as a page on this origin.
 const PASSIVE = /^(video|audio)\/|^image\/(png|jpeg|gif|webp)$|^text\/vtt$|^application\/(json|pdf)$/;
